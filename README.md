@@ -10,7 +10,7 @@ SparkFun SiT5811 OCXO Arduino Library
     </tr>
 </table>
 
-This is an Arduino Library for the SiT5811 Digitally-Controlled Oven-Compensated Crystal Oscillator from SiTime.
+This is an Arduino Library for the SiT5811 Digitally-Controlled Oven-Controlled Crystal Oscillator from SiTime.
 It allows you to fully configure the oscillator over I<sup>2</sup>C.
 Examples are provided which show how to control the frequency and pull range.
 
