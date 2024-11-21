@@ -27,16 +27,26 @@ bool SfeSiT5811Driver::begin()
     if (_theBus->ping() != kSTkErrOk)
         return false;
 
-    return readRegisters();
+    // Read the Clip register twice - in case the user is using the emulator
+    // (This ensures the emulator registerAddress points at 0x00 correctly)
+    if (readClipRegister())
+        if (readClipRegister())
+            // Read the registers twice - in case the user is using the emulator
+            // (This ensures the emulator registerAddress points at 0x0C correctly)
+            if (readRegisters())
+                return readRegisters();
+
+    return false;
 }
 
-/// @brief Read four SiT5811 registers and update the driver's internal copies
+/// @brief Read the SiT5811 OCXO Clip register and update the driver's internal copy
 /// @return true if the read is successful
-bool SfeSiT5811Driver::readRegisters(void)
+bool SfeSiT5811Driver::readClipRegister(void)
 {
-    // Read 2 bytes, starting at address kSfeSiT5811RegClip (0x00)
-    uint8_t theBytes[6];
+    uint8_t theBytes[2];
     size_t readBytes;
+
+    // Read 2 bytes, starting at address kSfeSiT5811RegClip (0x00)
     if (_theBus->readRegisterRegion(kSfeSiT5811RegClip, (uint8_t *)&theBytes[0], 2, readBytes) != kSTkErrOk)
         return false;
     if (readBytes != 2)
@@ -50,6 +60,19 @@ bool SfeSiT5811Driver::readRegisters(void)
     clipReg.word = register00;
     _clip = clipReg.clip;
 
+    return true;
+}
+
+/// @brief Read the three SiT5811 frequency control registers and update the driver's internal copies
+/// @return true if the read is successful
+bool SfeSiT5811Driver::readRegisters(void)
+{
+    uint8_t theBytes[6];
+    size_t readBytes;
+    uint16_t register0C;
+    uint16_t register0D;
+    uint16_t register0E;
+
     // Read 6 bytes, starting at address kSfeSiT5811RegControlMSW (0x0C)
     if (_theBus->readRegisterRegion(kSfeSiT5811RegControlMSW, (uint8_t *)&theBytes[0], 6, readBytes) != kSTkErrOk)
         return false;
@@ -57,23 +80,27 @@ bool SfeSiT5811Driver::readRegisters(void)
         return false;
 
     // Extract the three 16-bit registers - MSB first
-    uint16_t register0C = (((uint16_t)theBytes[0]) << 8) | ((uint16_t)theBytes[1]); // Frequency Control MSW
-    uint16_t register0D = (((uint16_t)theBytes[2]) << 8) | ((uint16_t)theBytes[3]); // Frequency Control NSW
-    uint16_t register0E = (((uint16_t)theBytes[4]) << 8) | ((uint16_t)theBytes[5]); // Frequency Control LSW
+    register0C = (((uint16_t)theBytes[0]) << 8) | ((uint16_t)theBytes[1]); // Frequency Control MSW
+    register0D = (((uint16_t)theBytes[2]) << 8) | ((uint16_t)theBytes[3]); // Frequency Control NSW
+    register0E = (((uint16_t)theBytes[4]) << 8) | ((uint16_t)theBytes[5]); // Frequency Control LSW
 
     // Extract the frequency control bits from register0E
     sfe_SiT5811_reg_control_lsw_t controlLSW;
     controlLSW.word = register0E;
+
     union // Avoid any ambiguity when converting uint64_t to int64_t
     {
         uint64_t unsigned64;
         int64_t signed64;
     } unsignedSigned64;
-    unsignedSigned64.unsigned64 = (((uint64_t)register0C) << 23)
+
+    unsignedSigned64.unsigned64 = ((((uint64_t)register0C) << 23)
                                 | (((uint64_t)register0D) << 7)
                                 | ((uint64_t)controlLSW.freqControl));
+
     if ((unsignedSigned64.unsigned64 & 0x0000004000000000) != 0) // Two's complement
         unsignedSigned64.unsigned64 |= 0xFFFFFFC000000000;
+
     _frequencyControl = unsignedSigned64.signed64; // Store the two's complement frequency control word
 
     return true;
@@ -182,7 +209,7 @@ bool SfeSiT5811Driver::setFrequencyHz(double freq)
     double maxPullHz = _baseFrequencyHz * _maxPullRange;
 
     // Calculate the maximum frequency offset in Hz, based on the available pull range
-    double maxPullClippedHz = _baseFrequencyHz * getMaxPullAvailable()
+    double maxPullClippedHz = _baseFrequencyHz * getMaxPullAvailable();
 
     // Limit freqOffsetHz to maxPullClippedHz
     if (freqOffsetHz >= 0.0)
@@ -216,11 +243,11 @@ bool SfeSiT5811Driver::setFrequencyHz(double freq)
     int64_t freqControlInt = (int64_t)freqControl;
 
     // Just in case, ensure freqControlInt is limited to 2^38 (39-bits signed)
-    if (freqControlInt > 33554431)
-        freqControlInt = 33554431;
+    if (freqControlInt > 274877906943)
+        freqControlInt = 274877906943;
 
-    if (freqControlInt < -33554432)
-        freqControlInt = -33554432;
+    if (freqControlInt < -274877906944)
+        freqControlInt = -274877906944;
 
     return setFrequencyControlWord(freqControlInt);
 }
@@ -241,13 +268,13 @@ void SfeSiT5811Driver::setMaxFrequencyChangePPB(double ppb)
 
 /// @brief Set the frequency according to the GNSS receiver clock bias in milliseconds
 /// @param bias the GNSS RX clock bias in milliseconds
-/// @param Pk the Proportional term (default 1.0)
-/// @param Ik the Integral term (default 0.0)
+/// @param Pk the Proportional term
+/// @param Ik the Integral term
 /// @return true if the write is successful
 /// Note: the frequency change will be limited by: the pull range capabilities of the device;
 ///       and the setMaxFrequencyChangePPB. Call getFrequencyHz to read the frequency set.
 /// The default values for Pk and Ik come from very approximate Ziegler-Nichols tuning:
-/// oscillation starts when Pk is ~1.4; with a period of ~5 seconds.
+/// oscillation starts when Pk is TODO; with a period of TODO seconds.
 bool SfeSiT5811Driver::setFrequencyByBiasMillis(double bias, double Pk, double Ik)
 {
     double freq = getFrequencyHz();
@@ -269,7 +296,7 @@ bool SfeSiT5811Driver::setFrequencyByBiasMillis(double bias, double Pk, double I
     errorInClocks /= clockInterval_s; // Convert error to clock cycles
 
     // Calculate the maximum frequency change in clock cycles
-    double maxChangeInClocks = freq * _maxFrequencyChangePPB / 1.0e9;
+    double maxChangeInClocks = freq * _maxFrequencyChangePPB * 1.0e-9;
 
     // Limit errorInClocks to +/-maxChangeInClocks
     if (errorInClocks >= 0.0)

@@ -102,7 +102,12 @@ public:
     /// @return true if readRegisters is successful.
     bool begin(void);
 
-    /// @brief Read four SiT5811 registers and update the driver's internal copies
+
+    /// @brief Read the SiT5811 OCXO Clip register and update the driver's internal copy
+    /// @return true if the read is successful
+    bool readClipRegister(void);
+
+    /// @brief Read the three SiT5811 frequency control registers and update the driver's internal copies
     /// @return true if the read is successful
     bool readRegisters(void);
 

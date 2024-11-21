@@ -3,7 +3,7 @@
 
   By: Paul Clark
   SparkFun Electronics
-  Date: 2024/8/1
+  Date: 2024/11/21
   SparkFun code, firmware, and software is released under the MIT License.
   Please see LICENSE.md for further details.
 
@@ -40,18 +40,14 @@ void setup()
   Serial.print(myOCXO.getBaseFrequencyHz());
   Serial.println(" Hz");
 
-  myOCXO.setPullRangeControl(SiT5811_PULL_RANGE_200ppm); // Set the pull range control to 200ppm
-
-  Serial.print("Pull range control set to ");
-  Serial.println(myOCXO.getPullRangeControlText(myOCXO.getPullRangeControl()));
-
-  myOCXO.setFrequencyHz(10001000.0); // Set the frequency to 10.001MHz (+100ppm)
+  myOCXO.setFrequencyHz(10000010.0); // Set the frequency to 10.000010MHz (+1ppm)
 
   Serial.print("Frequency set to ");
   Serial.print(myOCXO.getFrequencyHz());
   Serial.println(" Hz");
 
-  Serial.print("Frequency control word should be 16777215. It is ");
+  // Frequency control word should be 1ppm / 800ppm * (2^38 - 1) , rounded down
+  Serial.print("Frequency control word should be 343597383. It is ");
   Serial.println(myOCXO.getFrequencyControlWord());
 }
 

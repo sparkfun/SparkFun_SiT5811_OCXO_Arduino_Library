@@ -5,7 +5,7 @@
 
   By: Paul Clark
   SparkFun Electronics
-  Date: 2024/8/1
+  Date: 2024/11/21
   SparkFun code, firmware, and software is released under the MIT License.
   Please see LICENSE.md for further details.
 
@@ -42,10 +42,14 @@ void setup()
   Serial.print(myOCXO.getBaseFrequencyHz());
   Serial.println(" Hz");
 
-  myOCXO.setPullRangeControl(SiT5811_PULL_RANGE_200ppm); // Set the pull range control to 200ppm
+  // Read the available (clipped) pull range
+  double pullAvailable = myOCXO.getMaxPullAvailable();
+  Serial.printf("Maximum frequency pull is: %e\r\n", pullAvailable);
 
-  Serial.print("Pull range control set to ");
-  Serial.println(myOCXO.getPullRangeControlText(myOCXO.getPullRangeControl()));
+  double lowestFrequency = 10e6 - (10e6 * pullAvailable);
+  Serial.print("The lowest frequency available is ");
+  Serial.print(lowestFrequency);
+  Serial.println(" Hz");
 
   myOCXO.setFrequencyHz(9900000.0); // Try to set the frequency to 9.9MHz (-10000ppm)
 
@@ -53,7 +57,13 @@ void setup()
   Serial.print(myOCXO.getFrequencyHz());
   Serial.println(" Hz");
 
-  Serial.print("Frequency control word should be -33554432. It is ");
+  double fractionalPull = pullAvailable / 800e-6; // Fractional pull compared to 800ppm
+  fractionalPull *= pow(2, 38); // Convert to expected control word
+  int64_t expectedControlWord = 0 - fractionalPull;
+
+  Serial.print("Frequency control word should be ");
+  Serial.print(expectedControlWord);
+  Serial.print(". It is ");
   Serial.println(myOCXO.getFrequencyControlWord());
 }
 

@@ -5,7 +5,7 @@
 
   By: Paul Clark
   SparkFun Electronics
-  Date: 2024/8/1
+  Date: 2024/11/21
   SparkFun code, firmware, and software is released under the MIT License.
   Please see LICENSE.md for further details.
 
@@ -31,9 +31,9 @@ void setup()
   Wire.begin(); // Begin the I2C bus
 
   bool begun;
-  begun = myOCXO.begin(Wire, 0x60); // Initialize the SiT5811 - using a custom bus and address
-  begun = myOCXO.begin(0x60); // This is also possible. It defaults to Wire
-  begun = myOCXO.begin(); // This is also possible. It defaults to Wire and address 0x60
+  begun = myOCXO.begin(Wire, 0x50); // Initialize the SiT5811 - using a custom bus and address
+  begun = myOCXO.begin(0x50); // This is also possible. It defaults to Wire
+  begun = myOCXO.begin(); // This is also possible. It defaults to Wire and address 0x50
 
   if (!begun)
   {
@@ -42,14 +42,13 @@ void setup()
   }
 
   // Read the frequency control word - should be zero initially
-  int32_t fcw = myOCXO.getFrequencyControlWord();
+  int64_t fcw = myOCXO.getFrequencyControlWord();
   Serial.print("The frequency control word is: ");
   Serial.println(fcw);
 
-  // Read the pull range control
-  uint8_t prc = myOCXO.getPullRangeControl();
-  Serial.print("Pull range control is: ");
-  Serial.println(myOCXO.getPullRangeControlText(prc));
+  // Read the available (clipped) pull range
+  double pullAvailable = myOCXO.getMaxPullAvailable();
+  Serial.printf("Maximum frequency pull is: %e\r\n", pullAvailable);
 }
 
 void loop()
