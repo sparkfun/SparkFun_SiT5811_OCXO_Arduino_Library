@@ -35,210 +35,61 @@
 #include <stdint.h>
 
 #include <Arduino.h>
+// .. some header order issue right now...
+// clang-format off
 #include <SparkFun_Toolkit.h>
+#include "sfTk/sfDevSiT5811.h"
+// clang-format on
 
-///////////////////////////////////////////////////////////////////////////////
-// I2C Addressing
-///////////////////////////////////////////////////////////////////////////////
-// The SiT5811 can be ordered with a pre-programmed I2C address in the range
-// 0x50 to 0x5F (unshifted). It can also be ordered with a selectable address
-// of 0x50/52/58/5A via the A0/A1 Pins. Here we assume a default address of 0x50.
-// The actual address can be defined via the begin method.
-const uint8_t kDefaultSiT5811Addr = 0x50; // 
-
-///////////////////////////////////////////////////////////////////////////////
-// 16-bit Register Addresses
-///////////////////////////////////////////////////////////////////////////////
-
-const uint8_t kSfeSiT5811RegClip = 0x00; // DCXO Clip 13-bit
-const uint8_t kSfeSiT5811RegControlMSW = 0x0C; // Digital Frequency Control Most Significant Word (MSW)
-const uint8_t kSfeSiT5811RegControlNSW = 0x0D; // Digital Frequency Control Next Significant Word (NSW)
-const uint8_t kSfeSiT5811RegControlLSW = 0x0E; // Digital Frequency Control Least Significant Word (LSW)
-
-///////////////////////////////////////////////////////////////////////////////
-// OCXO Clip Register Description
-///////////////////////////////////////////////////////////////////////////////
-
-// A union is used here so that individual values from the register can be
-// accessed or the whole register can be accessed.
-typedef union
+class SfeSiT5811ArdI2C : public sfDevSiT5811
 {
-    struct
-    {
-        uint16_t clip : 13; // DCXO_Clip[12:0]
-        uint16_t notUsed : 3; // Not used
-    };
-    uint16_t word;
-} sfe_SiT5811_reg_clip_t;
-
-///////////////////////////////////////////////////////////////////////////////
-// Digital Frequency Control Least Significant Word (LSW) Register Description
-///////////////////////////////////////////////////////////////////////////////
-
-// A union is used here so that individual values from the register can be
-// accessed or the whole register can be accessed.
-typedef union
-{
-    struct
-    {
-        uint16_t notUsed : 9; // Not used
-        uint16_t freqControl : 7; // DCXO[6:0]
-    };
-    uint16_t word;
-} sfe_SiT5811_reg_control_lsw_t;
-
-///////////////////////////////////////////////////////////////////////////////
-
-class SfeSiT5811Driver
-{
-public:
-    // @brief Constructor. Instantiate the driver object using the specified address (if desired).
-    SfeSiT5811Driver()
-        : _baseFrequencyHz{10000000.0}, _maxFrequencyChangePPB{800000.0}
-    {
-    }
-
-    /// @brief Begin communication with the SiT5811. Read the registers.
-    /// @return true if readRegisters is successful.
-    bool begin(void);
-
-
-    /// @brief Read the SiT5811 OCXO Clip register and update the driver's internal copy
-    /// @return true if the read is successful
-    bool readClipRegister(void);
-
-    /// @brief Read the three SiT5811 frequency control registers and update the driver's internal copies
-    /// @return true if the read is successful
-    bool readRegisters(void);
-
-
-    /// @brief Get the 39-bit frequency control word - from the driver's internal copy
-    /// @return The 39-bit frequency control word as int64_t (signed, two's complement)
-    int64_t getFrequencyControlWord(void);
-
-    /// @brief Set the 39-bit frequency control word - and update the driver's internal copy
-    /// @param freq the frequency control word as int64_t (signed, two's complement)
-    /// @return true if the write is successful
-    bool setFrequencyControlWord(int64_t freq);
-
-
-    /// @brief Get the 13-bit clip value - from the driver's internal copy
-    /// @return The 13-bit clip as uint16_t
-    uint16_t getPullRangeClip(void);
-
-    /// @brief Get the clip value - from the driver's internal copy. Convert to maximum pull available
-    /// @return The clip value converted to maximum pull available (double)
-    double getMaxPullAvailable(void);
-
-
-    /// @brief Get the base oscillator frequency - from the driver's internal copy
-    /// @return The oscillator base frequency as double
-    double getBaseFrequencyHz(void);
-
-    /// @brief Set the base oscillator frequency in Hz - set the driver's internal _baseFrequencyHz
-    /// @param freq the base frequency in Hz
-    /// @return true if the write is successful
-    void setBaseFrequencyHz(double freq);
-
-
-    /// @brief Get the oscillator frequency based on the base frequency and control word
-    /// @return The oscillator frequency as double
-    double getFrequencyHz(void);
-
-    /// @brief Set the oscillator frequency based on the base frequency and pull range limit
-    /// @param freq the oscillator frequency in Hz
-    /// @return true if the write is successful
-    /// Note: The frequency change will be limited by the pull range capabilities of the device.
-    ///       Call getFrequencyHz to read the frequency set.
-    /// Note: setFrequencyHz ignores _maxFrequencyChangePPB.
-    bool setFrequencyHz(double freq);
-
-
-    /// @brief Get the maximum frequency change in PPB
-    /// @return The maximum frequency change in PPB - from the driver's internal store
-    double getMaxFrequencyChangePPB(void);
-
-    /// @brief Set the maximum frequency change in PPB - set the driver's internal _maxFrequencyChangePPB
-    /// @param ppb the maximum frequency change in PPB
-    void setMaxFrequencyChangePPB(double ppb);
-
-
-    /// @brief Set the frequency according to the GNSS receiver clock bias in milliseconds
-    /// @param bias the GNSS RX clock bias in milliseconds
-    /// @param Pk the Proportional term
-    /// @param Ik the Integral term
-    /// @return true if the write is successful
-    /// Note: the frequency change will be limited by: the pull range capabilities of the device;
-    ///       and the setMaxFrequencyChangePPB. Call getFrequencyHz to read the frequency set.
-    /// The default values for Pk and Ik come from very approximate Ziegler-Nichols tuning:
-    /// oscillation starts when Pk is TODO; with a period of TODO seconds.
-    bool setFrequencyByBiasMillis(double bias, double Pk = 0.5, double Ik = 0.1);
-
-
-protected:
-    /// @brief Sets the communication bus to the specified bus.
-    /// @param theBus Bus to set as the communication devie.
-    void setCommunicationBus(sfeTkArdI2C *theBus);
-
-private:
-    sfeTkArdI2C *_theBus; // Pointer to bus device.
-
-    const double _maxPullRange = 800e-6; // Maximum pull range is +/- 800ppm
-    int64_t _frequencyControl; // Local store for the frequency control word. 39-Bit, 2's complement
-    uint16_t _clip; // Local store for the 13-bit OCXO Clip register value
-    double _baseFrequencyHz; // The base frequency used by getFrequencyHz and setFrequencyHz
-    double _maxFrequencyChangePPB; // The maximum frequency change in PPB for setFrequencyByBiasMillis
-};
-
-class SfeSiT5811ArdI2C : public SfeSiT5811Driver
-{
-public:
+  public:
     SfeSiT5811ArdI2C()
     {
     }
 
-    /// @brief  Sets up Arduino I2C driver using the default I2C address then calls the super class begin.
+    // /// @brief  Sets up Arduino I2C driver using the default I2C address then calls the super class begin.
+    // /// @return True if successful, false otherwise.
+    // bool begin(void)
+    // {
+    //     if (_theI2CBus.init(kDefaultSiT5811Addr) != kSTkErrOk)
+    //         return false;
+
+    //     return beginDevice();
+    // }
+
+    /// @brief  Sets up Arduino I2C driver using the specified I2C address then calls the super class begin.
     /// @return True if successful, false otherwise.
-    bool begin(void)
+    bool begin(const uint8_t address = kDefaultSiT5811Addr)
     {
-        if (_theI2CBus.init(kDefaultSiT5811Addr) != kSTkErrOk)
+        if (_theI2CBus.init(address) != ksfTkErrOk)
             return false;
 
-        setCommunicationBus(&_theI2CBus);
-
-        _theI2CBus.setStop(false); // Use restarts not stops for I2C reads
-
-        return SfeSiT5811Driver::begin();
+        return beginDevice();
     }
 
     /// @brief  Sets up Arduino I2C driver using the specified I2C address then calls the super class begin.
     /// @return True if successful, false otherwise.
-    bool begin(const uint8_t &address)
+    bool begin(TwoWire &wirePort, const uint8_t address = kDefaultSiT5811Addr)
     {
-        if (_theI2CBus.init(address) != kSTkErrOk)
+        if (_theI2CBus.init(wirePort, address) != ksfTkErrOk)
             return false;
 
-        setCommunicationBus(&_theI2CBus);
+        return beginDevice();
+    }
+
+  private:
+    bool beginDevice(void)
+    {
+
+        // the intent is that the bus is setup and we can see if the device is connected
+        if (_theI2CBus.ping() == ksfTkErrOk)
+            return false;
 
         _theI2CBus.setStop(false); // Use restarts not stops for I2C reads
 
-        return SfeSiT5811Driver::begin();
+        return sfDevSiT5811::begin(&_theI2CBus) == ksfTkErrOk;
     }
 
-    /// @brief  Sets up Arduino I2C driver using the specified I2C address then calls the super class begin.
-    /// @return True if successful, false otherwise.
-    bool begin(TwoWire &wirePort, const uint8_t &address)
-    {
-        if (_theI2CBus.init(wirePort, address) != kSTkErrOk)
-            return false;
-
-        setCommunicationBus(&_theI2CBus);
-
-        _theI2CBus.setStop(false); // Use restarts not stops for I2C reads
-
-        return SfeSiT5811Driver::begin();
-    }
-
-private:
-    sfeTkArdI2C _theI2CBus;
+    sfTkArdI2C _theI2CBus;
 };
