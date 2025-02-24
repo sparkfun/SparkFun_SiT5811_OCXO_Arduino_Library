@@ -52,7 +52,7 @@ bool sfDevSiT5811::readClipRegister(void)
     size_t readBytes;
 
     // Read 2 bytes, starting at address kSfeSiT5811RegClip (0x00)
-    if (_theBus->readRegisterRegion(kSfeSiT5811RegClip, (uint8_t *)&theBytes[0], 2, readBytes) != ksfTkErrOk)
+    if (_theBus->readRegister(kSfeSiT5811RegClip, (uint8_t *)&theBytes[0], 2, readBytes) != ksfTkErrOk)
         return false;
     if (readBytes != 2)
         return false;
@@ -79,7 +79,7 @@ bool sfDevSiT5811::readRegisters(void)
     uint16_t register0E;
 
     // Read 6 bytes, starting at address kSfeSiT5811RegControlMSW (0x0C)
-    if (_theBus->readRegisterRegion(kSfeSiT5811RegControlMSW, (uint8_t *)&theBytes[0], 6, readBytes) != ksfTkErrOk)
+    if (_theBus->readRegister(kSfeSiT5811RegControlMSW, (uint8_t *)&theBytes[0], 6, readBytes) != ksfTkErrOk)
         return false;
     if (readBytes != 6)
         return false;
@@ -138,7 +138,7 @@ bool sfDevSiT5811::setFrequencyControlWord(int64_t freq)
     theBytes[4] = (uint8_t)((unsignedSigned64.unsigned64 << 1) & 0xFF);  // LSW MSB
     theBytes[5] = 0;                                                     // LSW LSB
 
-    if (_theBus->writeRegisterRegion(kSfeSiT5811RegControlMSW, (const uint8_t *)&theBytes[0], 6) != ksfTkErrOk)
+    if (_theBus->writeRegister(kSfeSiT5811RegControlMSW, (const uint8_t *)&theBytes[0], 6) != ksfTkErrOk)
         return false; // Return false if the write failed
 
     _frequencyControl = freq; // Only update the driver's copy if the write was successful
